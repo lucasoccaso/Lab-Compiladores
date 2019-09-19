@@ -1,3 +1,6 @@
+// Nome: Iago Freitas Piedade      RA: 587567
+// Nome: Lucas Alexandre Occaso    RA: 620505
+
 package comp;
 import java.io.BufferedReader;
 import java.io.File;
