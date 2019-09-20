@@ -341,9 +341,9 @@ public class Lexer {
        return literalStringValue;
     }
 
-	public String getMetaobjectName() {
-		return metaobjectName;
-	}
+  	public String getMetaobjectName() {
+  		return metaobjectName;
+  	}
 
     private String metaobjectName;
           // current token
