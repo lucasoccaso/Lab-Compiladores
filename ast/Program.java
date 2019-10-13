@@ -14,9 +14,19 @@ public class Program {
 		this.metaobjectCallList = metaobjectCallList;
 		this.compilationErrorList = compilationErrorList;
 	}
+	public void setMainJavaClassName(String mainJavaClassName) {
+	this.mainJavaClassName = mainJavaClassName;
+	}
 
+	/**
+	the name of the main Java class when the
+	code is generated to Java. This name is equal
+	to the file name (without extension)
+	*/
+	private String mainJavaClassName;
 
 	public void genJava(PW pw) {
+		
 	}
 
 	public void genC(PW pw) {
