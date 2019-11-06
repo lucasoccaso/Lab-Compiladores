@@ -1,6 +1,3 @@
-// Nome: Iago Freitas Piedade      RA: 587567
-// Nome: Lucas Alexandre Occaso    RA: 620505
-
 package comp;
 import java.io.BufferedReader;
 import java.io.File;
@@ -214,6 +211,12 @@ public class Comp {
 			}
 		}
 		report.close();
+		try {
+			reportStream.close();
+		}
+		catch (IOException e) {
+			System.out.println("Error in closing the report file");
+		}
 		System.out.println("Cianeto compiler finished");
 
 	}
@@ -259,7 +262,7 @@ public class Comp {
 			partialReport.append("\r\n");
 			partialReport.append("O compilador falhou em testar alguns aspectos (construções) de Cianeto. "
 					+ "A lista abaixo consiste de entradas da forma \n"
-					+ "    aspecto\n        lists de nomes de arquivos\n");
+					+ "    aspecto\n        listas de nomes de arquivos\n");
 			partialReport.append("Os nomes de arquivos listados são aqueles que testam 'aspecto' mas em "
 					+ "que o compilador falhou em apontar um erro, apontou um erro inexistente ou gerou código errado (se opção -genjava ou -genc foi usada).\r\n");
 			if ( ! printReportCheckNameFilenameList(checkNameFilenameListCompilerFailedMap, partialReport, true) ) {
@@ -270,7 +273,7 @@ public class Comp {
 		if ( this.checkNameFilenameListCompilerSucceededMap.size() > 0 ) {
 			partialReport.append("O compilador obteve sucesso em testar alguns aspectos (construções) de Cianeto. "
 					+ "A lista abaixo consiste de entradas da forma \n"
-					+ "    aspecto\n        lists de nomes de arquivos\n");
+					+ "    aspecto\n        listas de nomes de arquivos\n");
 			partialReport.append("Os nomes de arquivos listados são aqueles que testam 'aspecto' e nos quais "
 					+ "o compilador obteve sucesso e gerou código correto (se opção -genjava ou -genc foi usada).\r\n");
 			if ( ! printReportCheckNameFilenameList(checkNameFilenameListCompilerSucceededMap, partialReport, false) ) {
@@ -440,15 +443,15 @@ public class Comp {
 //	}
 
 
+
 	private static boolean printReportCheckNameFilenameList(Map<String, String> checkNameFilenameList,
-			StringBuilder partialReport, boolean succeeded ) {
+			StringBuilder partialReport, boolean compilerFailed ) {
 		ArrayList<TupleCheckNameText> ta = new ArrayList<>();
 		for ( Entry<String, String> entry : checkNameFilenameList.entrySet() ) {
 			String checkName = entry.getKey();
+			int numFiles = 0;
 			Integer importance = Comp.testNameWeightMap.get(checkName);
 			if ( importance == null ) {
-//				report.println("*******************************\nFailed to produce report: check name '" +
-//			       checkName + "' is not allowed");
 				partialReport.append("*******************************\nFailed to produce report: check name '" +
 					       checkName + "' is not allowed" + "\r\n");
 				return false;
@@ -458,50 +461,51 @@ public class Comp {
 			s.append("    " + checkName + "\r\n");
 			if ( filenameListStr.indexOf(" ") < 0 ) {
 				s.append("        " + filenameListStr + "\r\n");
+				++numFiles;
 			}
 			else {
 				String []filenameList = filenameListStr.split(" ");
 				for ( String filename : filenameList ) {
 					s.append("        " + filename + "\r\n");
+					++numFiles;
 				}
 			}
-			ta.add(new TupleCheckNameText(checkName, importance, s.toString()));
+			ta.add(new TupleCheckNameText(checkName, importance, s.toString(), numFiles));
 		}
 		Collections.sort(ta);
-		//report.println("Os testes são categorizados por importância: 'Muito importante', 'Importante', 'pouco importante'");
 		partialReport.append("Os testes são categorizados por importância: 'Muito importante', 'Importante', 'pouco importante'\r\n");
 		if ( ta.get(0).importance >= 5 ) {
 			//report.println("\nTestes 'Muito importantes' em que o compilador falhou:");
-			partialReport.append("\nTestes 'Muito importantes' em que o compilador " + (succeeded ? "falhou" : "acertou") + ":\r\n");
+			partialReport.append("\nTestes 'Muito importantes' em que o compilador " + (compilerFailed ? "falhou" : "acertou") + ":\r\n");
 		}
 		boolean alreadPrintMessage3 = false;
 		boolean alreadPrintMessage2 = false;
 		for ( TupleCheckNameText t : ta ) {
-			if ( t.importance >= 5 ) {
-				++Comp.numVeryImportantFailed;
-			}
-			else if ( t.importance > 1 ) {
-				++Comp.numImportantFailed;
-			}
-			else {
-				++Comp.numLittleImportantFailed;
+			if ( compilerFailed ) {
+				if ( t.importance >= 5 ) {
+					Comp.numVeryImportantFailed += t.numFiles;
+				}
+				else if ( t.importance > 1 ) {
+					Comp.numImportantFailed += t.numFiles;
+				}
+				else {
+					Comp.numLittleImportantFailed += t.numFiles;
+				}
 			}
 			if ( !alreadPrintMessage3 && t.importance < 5 && t.importance > 1 ) {
 				alreadPrintMessage3 = true;
-				//report.println("\nTestes 'importantes' em que o compilador falhou:");
-				partialReport.append("\nTestes 'importantes' em que o compilador falhou:\r\n");
+				partialReport.append("\nTestes 'importantes' em que o compilador " +
+				    (compilerFailed ? "falhou" : "acertou") + ":\r\n");
 			}
 			if ( !alreadPrintMessage2 && t.importance < 3  ) {
 				alreadPrintMessage2 = true;
-				// report.println("\nTestes 'pouco importantes' em que o compilador falhou:");
-				partialReport.append("\nTestes 'pouco importantes' em que o compilador falhou:\r\n");
+				partialReport.append("\nTestes 'pouco importantes' em que o compilador " +
+				    (compilerFailed ? "falhou" : "acertou") + "\r\n");
 			}
-			//report.append(t.text);
 			partialReport.append(t.text + "\r\n");
 		}
 		return true;
 	}
-
 	/**
 	   @param args
 	   @param stream
@@ -825,11 +829,12 @@ public class Comp {
 			String className = javaFilename.substring(0, javaFilename.length() - dotJavaLength);
 
 			javaFilename = this.dirToJavaOutput + File.separator + javaFilename;
-			PrintWriter printWriter = null;
-			try ( FileOutputStream fos = new FileOutputStream(javaFilename) ) {
-				printWriter = new PrintWriter(fos, true);
+
+			try ( FileOutputStream fos = new FileOutputStream(javaFilename);
+					PrintWriter printWriter = new PrintWriter(fos, true) ) {
 				PW pw = new PW(printWriter);
 				try {
+					program.setMainJavaClassName(className);
 					program.genJava(pw);
 				}
 				catch( Throwable e ) {
@@ -939,8 +944,8 @@ public class Comp {
 						++lineCount;
 					}
 				}
-				String result = removeExtraSpacesFirstLine(firstLine);
-				alloutput = removeExtraSpaces(alloutput);
+				String result = removeExtraSpacesFirstLine(firstLine).trim();
+				alloutput = removeExtraSpaces(alloutput).trim();
 
 
 				if ( result.equals(alloutput) ) {
@@ -1059,10 +1064,11 @@ public class Comp {
 
 
 class TupleCheckNameText implements Comparable<TupleCheckNameText> {
-	public TupleCheckNameText(String checkName, int importance, String text) {
+	public TupleCheckNameText(String checkName, int importance, String text, int numFiles) {
 		this.checkName = checkName;
 		this.importance = importance;
 		this.text = text;
+		this.numFiles = numFiles;
 	}
 
 	@Override
@@ -1081,4 +1087,6 @@ class TupleCheckNameText implements Comparable<TupleCheckNameText> {
 	String checkName;
 	int importance;
 	String text;
+	int numFiles;
+
 }

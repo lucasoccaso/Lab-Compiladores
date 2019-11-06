@@ -1,6 +1,3 @@
-// Nome: Iago Freitas Piedade      RA: 587567
-// Nome: Lucas Alexandre Occaso    RA: 620505
-
 package lexer;
 
 public enum Token {
@@ -28,6 +25,7 @@ public enum Token {
     ID("~ident"),
     IDCOLON("~ident:"),
     IF("if"),
+    IN("In"),
     INT("Int"),
     LE("<="),
     LEFTCURBRACKET("{"),
@@ -41,12 +39,16 @@ public enum Token {
     NEQ("!="),
     NEW("new"),
     NOT("!"),
-    NIL("nil"),
+    NULL("null"),
     OR("||"),
     OVERRIDE("override"),
     PLUS("+"),
+    PLUSPLUS("++"),
     PRIVATE("private"),
     PUBLIC("public"),
+    READ("read"),
+    READINT("readInt"),
+    READSTRING("readString"),
     REPEAT("repeat"),
     RETURN("return"),
     RIGHTCURBRACKET("}"),
@@ -58,7 +60,10 @@ public enum Token {
     TRUE("true"),
     UNTIL("until"),
     VAR("var"),
+    VOID("void"),
     WHILE("while"),
+    WRITE("write"),
+    WRITELN("writeln");
 
 	Token(String name) {
 		this.name = name;

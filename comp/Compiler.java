@@ -12,6 +12,8 @@ import ast.Statement;
 import ast.TypeCianetoClass;
 import lexer.Lexer;
 import lexer.Token;
+import ast.*;
+
 
 public class Compiler {
 
@@ -60,10 +62,18 @@ public class Compiler {
 					}
 				}
 			}
-			catch ( RuntimeException e ) {
-				e.printStackTrace();
-				thereWasAnError = true;
-			}
+			catch ( Throwable e ) {
+	            e.printStackTrace();
+	            thereWasAnError = true;
+	            // adicione as linhas abaixo
+	            try {
+	                error("Exception '" + e.getClass().getName() + "' was thrown and not caught. "
+	                        + "Its message is '" + e.getMessage() + "'");
+	            }
+	            catch( CompilerError ee) {
+	            }
+	            return program; // add this line
+	        }
 
 		}
 		if ( !thereWasAnError && lexer.token != Token.EOF ) {
@@ -126,19 +136,24 @@ public class Compiler {
 				error("Annotation 'nce' does not take parameters");
 			break;
 		case "cep":
-			if ( metaobjectParamList.size() != 3 && metaobjectParamList.size() != 4 )
-				error("Annotation 'cep' takes three or four parameters");
-			if ( !( metaobjectParamList.get(0) instanceof Integer)  ) {
-				error("The first parameter of annotation 'cep' should be an integer number");
+			int sizeParamList = metaobjectParamList.size();
+			if ( sizeParamList < 2 || sizeParamList > 4 )
+			error("Annotation 'cep' takes two, three, or four parameters");
+
+			if ( !( metaobjectParamList.get(0) instanceof Integer) ) {
+			error("The first parameter of annotation 'cep' should be an integer number");
 			}
 			else {
-				int ln = (Integer ) metaobjectParamList.get(0);
-				metaobjectParamList.set(0, ln + lineNumber);
+			int ln = (Integer ) metaobjectParamList.get(0);
+			metaobjectParamList.set(0, ln + lineNumber);
 			}
-			if ( !( metaobjectParamList.get(1) instanceof String) ||  !( metaobjectParamList.get(2) instanceof String) )
-				error("The second and third parameters of annotation 'cep' should be literal strings");
-			if ( metaobjectParamList.size() >= 4 && !( metaobjectParamList.get(3) instanceof String) )
-				error("The fourth parameter of annotation 'cep' should be a literal string");
+			if ( !( metaobjectParamList.get(1) instanceof String) )
+			error("The second parameter of annotation 'cep' should be a literal string");
+			if ( sizeParamList >= 3 && !( metaobjectParamList.get(2) instanceof String) )
+			error("The third parameter of annotation 'cep' should be a literal string");
+			if ( sizeParamList >= 4 && !( metaobjectParamList.get(3) instanceof String) )
+			error("The fourth parameter of annotation 'cep' should be a literal string");
+
 			break;
 		case "annot":
 			if ( metaobjectParamList.size() < 2  ) {
@@ -160,12 +175,12 @@ public class Compiler {
 		if ( getNextToken ) lexer.nextToken();
 	}
 
-	// AssertStat ::= “assert” Expression “,” StringValue
 	public Statement assertStat() {
-
+		Expr expr;
+		
 		lexer.nextToken();
-		int lineNumber = lexer.getLineNumber();
-		expr();
+		
+		expr = expr();
 		if ( lexer.token != Token.COMMA ) {
 			this.error("',' expected after the expression of the 'assert' statement");
 		}
@@ -173,22 +188,28 @@ public class Compiler {
 		if ( lexer.token != Token.LITERALSTRING ) {
 			this.error("A literal string expected after the ',' of the 'assert' statement");
 		}
-		String message = lexer.getLiteralStringValue();
+		String literalString = lexer.getLiteralStringValue();
 		lexer.nextToken();
 		if ( lexer.token == Token.SEMICOLON )
 			lexer.nextToken();
 
-		return null;
+		return new AssertStat(expr, literalString);
 	}
 
-	// AssignExpr ::= Expression [ “=” Expression ]
-	private void assignExpr() {
+	// AssignExpr ::= Expression [ "=" Expression ]
+	private AssignExpr assignExpr() {
+		Expr left, right = null;
+		
+		left = expr();
         next();
-        expr();
+        if( lexer.token == Token.ASSIGN ) {
+        	right = expr();
+        }
+
+        return new AssignExpr(left, right);
     }
 
 	
-
 	private void error(String msg) {
 		this.signalError.showError(msg);
 	}
@@ -198,6 +219,7 @@ public class Compiler {
 		lexer.nextToken();
 	}
 
+	
 	private void check(Token shouldBe, String msg) {
 		if ( lexer.token != shouldBe ) {
 			error(msg);
@@ -216,70 +238,92 @@ public class Compiler {
 	}
 
 
-	// ClassDec ::= [ “open” ] “class” Id [ “extends” Id ] MemberList “end”
-	private void classDec() {
+	// ClassDec ::= [ "open" ] "class" Id [ "extends" Id ] MemberList "end"
+	private TypeCianetoClass classDec() {
+		MemberList memberlist = null;
+		
+		// Verifica se come�a com "open"
 		if ( lexer.token == Token.ID && lexer.getStringValue().equals("open") ) {
 			// open class
+			lexer.nextToken();
 		}
-		if ( lexer.token != Token.CLASS ) error("'class' expected");
+		// Verifica se tem "class"
+		if ( lexer.token != Token.CLASS ) {
+			error("'class' expected");
+		}
+		
 		lexer.nextToken();
-		if ( lexer.token != Token.ID )
+		//Verifica se tem um Id
+		if ( lexer.token != Token.ID ) {
 			error("Identifier expected");
+		}
+		
+		// Guarda o nome da classe
 		String className = lexer.getStringValue();
+		
+		//VERIFICAR SE A CLASSE JA EXISTE
+		
 		lexer.nextToken();
+		// Verifica se a classe extende de alguma superclasse
 		if ( lexer.token == Token.EXTENDS ) {
 			lexer.nextToken();
-			if ( lexer.token != Token.ID )
+			
+			// Verifica sem tem um Id da superclasse
+			if ( lexer.token != Token.ID ) {
 				error("Identifier expected");
+			}
 			String superclassName = lexer.getStringValue();
 
+			// VERIFICAR SE A SUPERCLASSE EXISTE
+			// VERIFICAR SE PODE EXTENDER DESSA SUPERCLASSE
+			
 			lexer.nextToken();
 		}
 
-		memberList();
+		memberlist = memberList();
 		if ( lexer.token != Token.END)
 			error("'end' expected");
 		lexer.nextToken();
 
 	}
 
-	// CompStatement ::= “{” { Statement } “}”
 	private void compStat(){
     	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
     	next();
-    	while(lexer.toke != Token.RIGHTCURBRACKET){
+    	while(lexer.token != Token.RIGHTCURBRACKET){
     		statement();
     	}
     	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
     	next();
     }
 
-    // Digit ::= “0” | ... | “9”
     private void digit(){
 
     }
 
     // Expression ::= SimpleExpression [ Relation SimpleExpression ]
-	private void expr() {
-		try {
-            ArrayList<Type> t1 = null;
-            ArrayList<Type> t2 = null;
-            t1 = simpleExpression();
-            if (lexer.token == Token.EQ || lexer.token == Token.LT || lexer.token == Token.LE
-                    || lexer.token == Token.GT || lexer.token == Token.GE || lexer.token == Token.NEQ) {
-                next();
-                ret = new TypeBoolean();
-                t2 = simpleExpression();
-                arrayTypes.addAll(t2);
-            }
-
-            arrayTypes.addAll(t1);
-        } catch (NullPointerException e) {
-
+	private Expr expr() {
+          
+        Expr left = simpleExpr();
+        Token op = lexer.token;
+        
+        if (op == Token.EQ || op == Token.LT || op == Token.LE
+                || op == Token.GT || op == Token.GE || op == Token.NEQ) {
+            next();
+            
+            Expr right = simpleExpr();
+        
+            left = new CompositeExpr(left, lexer.token, right);
+          
         }
+
+       
+     
+		
+		return left;
 	}
 
-	// ExpressionList ::= Expression { “,” Expression }
+
 	private void expressionList() {
         expr();
 
@@ -289,18 +333,10 @@ public class Compiler {
         }
     }
 
-    /*
-    Factor ::= BasicValue |
-	“(” Expression “)” |
-	“!” Factor |
-	“nil” |
-	ObjectCreation |
-	PrimaryExpr
-    */
-    private void factor(){
 
-    	if(lexer.token == Token.LITERALINT || lexer.token == Token.TRUE 
-    		lexer.token == Token.FALSE || lexer.token == Token.LITERALSTRING){
+    private Expr factor(){
+
+    	if(lexer.token == Token.LITERALINT || lexer.token == Token.TRUE || lexer.token == Token.FALSE || lexer.token == Token.LITERALSTRING){
     		next();
     	} else if(lexer.token == Token.LEFTPAR){
     		next();
@@ -310,19 +346,20 @@ public class Compiler {
     	} else if(lexer.token == Token.NOT){
     		next();
     		factor();
-    	} else if(lexer.token == Token.NIL){
+    	} else if(lexer.token == Token.NULL){
     		next();
     	} else if(lexer.token == Token.ID){
 
-    		//Não sei oq fazer ainda
+
     	} else if(lexer.token == Token.SUPER || lexer.token == Token.SELF){
     		primaryExpr();
     	} else if(lexer.token == Token.IN){
     		readExpr();
     	}
+    	
+    	return null;
     }
 
-    // FieldDec ::= “var” Type IdList [ “;” ]
 	private void fieldDec() {
 		lexer.nextToken();
 		type();
@@ -343,7 +380,6 @@ public class Compiler {
 
 	}
 
-	// FormalParamDec ::= ParamDec { “,” ParamDec }
 	private void formalParamDec() {
         paramDec();
 
@@ -353,7 +389,6 @@ public class Compiler {
         }
     }
 
-    // HighOperator ::= “∗” | “/” | “&&”
     private boolean highOperator(){
     	if (lexer.token == Token.MULT || lexer.token == Token.DIV || lexer.token == Token.AND) {
             return true;
@@ -362,7 +397,6 @@ public class Compiler {
         return false;
     }
 
-    // IfStat ::= “if” Expression “{” Statement “}” [ “else” “{” Statement “}” ]
 	private void ifStat() {
 		next();
 		expr();
@@ -383,12 +417,10 @@ public class Compiler {
 		}
 	}
 
-    // IntValue ::= Digit { Digit }
     private void intValue() {
         next();
     }
 
-    // LocalDec ::= “var” Type IdList [ “=” Expression ]
     private void localDec() {
 		next();
 		type();
@@ -410,7 +442,6 @@ public class Compiler {
 
 	}
 
-	// LowOperator ::= “+” | “−” | “||”
 	private boolean lowOperator() {
         if (lexer.token == Token.PLUS || lexer.token == Token.MINUS || lexer.token == Token.OR) {
             return true;
@@ -419,10 +450,13 @@ public class Compiler {
         return false;
     }
 
-    // MemberList ::= { [ Qualifier ] Member }
-    private void memberList() {
+	// MemberList ::= { [ Qualifier ] Member }
+    private MemberList memberList() {
+    	
 		while ( true ) {
-			qualifier();
+			
+			String qualifier = qualifier();
+			
 			if ( lexer.token == Token.VAR ) {
 				fieldDec();
 			}
@@ -435,10 +469,8 @@ public class Compiler {
 		}
 	}
 
-	/* MethodDec ::= “func” IdColon FormalParamDec [ “->” Type ]
-	“{” StatementList “}” |
-	“func” Id [ “->” Type ] “{” StatementList “}”
-	*/
+    
+    
 	private void methodDec() {
 		lexer.nextToken();
 		if ( lexer.token == Token.ID ) {
@@ -470,8 +502,8 @@ public class Compiler {
 
 	}
 
-	// ParamDec ::= Type Id
-	private void paramDec(String type) {
+
+	private void paramDec() {
 
         // Se nao encontrar um identificador apos o tipo de uma variavel, lanca um erro
         if (lexer.token != Token.ID) {
@@ -480,18 +512,7 @@ public class Compiler {
 
         next(); // Consome o id
     }
-
-	/*Qualifier ::= “private”
-	“public”
-	“override”
-	“override” “public”
-	“final”
-	“final” “public”
-	“final” “override”
-	“final” “override” “public”
-	“shared” “private”
-	“shared” “public”
-	*/
+	
 	private void qualifier() {
 		if ( lexer.token == Token.PRIVATE ) {
 			next();
@@ -519,7 +540,6 @@ public class Compiler {
 		}
 	}
 
-	// readExpr ::= 'In' '.' [ 'readInt' | 'readString' ]
     private String readExpr() {
     	String auxType = "";
         next(); 
@@ -538,7 +558,6 @@ public class Compiler {
         return auxType;
     }
 
-    // RepeatStat ::= “repeat” StatementList “until” Expression
     private void repeatStat() {
 		next();
 		while ( lexer.token != Token.UNTIL && lexer.token != Token.RIGHTCURBRACKET && lexer.token != Token.END ) {
@@ -560,18 +579,7 @@ public class Compiler {
 		return new LiteralInt(value);
 	}
 
-	/*PrimaryExpr ::= “super” “.” IdColon ExpressionList |
-	“super” “.” Id |
-	Id |
-	Id “.” Id |
-	Id “.” IdColon ExpressionList |
-	“self” |
-	“self” “.” Id |
-	“self” ”.” IdColon ExpressionList |
-	“self” ”.” Id “.” IdColon ExpressionList |
-	“self” ”.” Id “.” Id |
-	ReadExpr
-	*/
+
     private void primaryExpr() {
         if (lexer.token == Token.SUPER) {
             next();
@@ -628,7 +636,6 @@ public class Compiler {
         }
     }
 
-	// Relation ::= “==” | “<” | “>” | “<=” | “>=” | “! =”
 	private boolean relation() {
         if (lexer.token == Token.EQ || lexer.token == Token.LT || lexer.token == Token.GT ||
                 lexer.token == Token.LE || lexer.token == Token.GE || lexer.token == Token.NEQ) {
@@ -638,7 +645,6 @@ public class Compiler {
         return false;
     }
 
-	// Signal ::= “+” | “−”
 	private boolean signal() {
         if (lexer.token == Token.PLUS || lexer.token == Token.MINUS) {
             return true;
@@ -647,31 +653,43 @@ public class Compiler {
         return false;
     }
 
-    // SignalFactor ::= [ Signal ] Factor
     private Expr signalFactor(){
 
     	if(signal()){
     		next();
     	}
 
-    	return Factor();
+    	return factor();
     }
 
-    // SimpleExpression ::= SumSubExpression { “++” SumSubExpression }
+    
+    // SimpleExpression ::= SumSubExpression { "++" SumSubExpression }
+    private Expr simpleExpr() {
+		Token op;
+
+		//Pega o primeiro Term
+		Expr left = term();
+		//Verifica se h� um LowOperator ap�s o Term
+		while ((op = lexer.token) == Token.PLUSPLUS) {
+			//Consome o LoewOperator
+			lexer.nextToken();
+			//Le o proximo Term
+			Expr right = term();
+            
+			left = new CompositeExpr(left, op, right);
+		}
+		return left;
+	}
+
     private void SumSubExpr(){
 
     }
 
-   	// SumSubExpression ::= Term { LowOperator Term }
     private void sumSubExpr(){
 
     }
 
-    /*Statement ::= AssignExpr “;” | IfStat | WhileStat | ReturnStat “;” |
-	WriteStat “;” | “break” “;” | “;” |
-	RepeatStat “;” | LocalDec “;” |
-	AssertStat “;”
-    */
+
     private void statement() {
 		boolean checkSemiColon = true;
 		switch ( lexer.token ) {
@@ -715,7 +733,7 @@ public class Compiler {
 		}
 	}
 
-	// StatementList ::= { Statement }
+
 	private void statementList() {
 		  // only '}' is necessary in this test
 		while ( lexer.token != Token.RIGHTCURBRACKET && lexer.token != Token.END ) {
@@ -723,7 +741,7 @@ public class Compiler {
 		}
 	}
 
-    //Term ::= SignalFactor { HighOperator SignalFactor }
+
     private Expr term(){
     	Expr first = signalFactor();
 
@@ -735,7 +753,7 @@ public class Compiler {
     	return first;
     }
 
-    // Type ::= BasicType | Id
+
 	private void type() {
 		// BasicType ::= 'Int' | 'Boolean' | 'String'
 		if ( lexer.token == Token.INT || lexer.token == Token.BOOLEAN || lexer.token == Token.STRING ) {
@@ -750,7 +768,7 @@ public class Compiler {
 
 	}
 
-	// WriteStat ::= “Out” “.” [ “print:” | “println:” ] Expression
+
 	private void writeStat() {
 		next();
 		check(Token.DOT, "a '.' was expected after 'Out'");
@@ -760,7 +778,7 @@ public class Compiler {
 		expr();
 	}
 
-	// WhileStat ::= “while” Expression “{” StatementList “}”
+
 	private void whileStat() {
 		next();
 		expr();
@@ -775,11 +793,11 @@ public class Compiler {
 
 	private static boolean startExpr(Token token) {
 
-		return token == Token.FALSE || token == Token.TRUE
-				|| token == Token.NOT || token == Token.SELF
-				|| token == Token.LITERALINT || token == Token.SUPER
-				|| token == Token.LEFTPAR || token == Token.NULL
-				|| token == Token.ID || token == Token.LITERALSTRING;
+		return token == Token.FALSE 			|| token == Token.TRUE
+				|| token == Token.NOT 			|| token == Token.SELF
+				|| token == Token.LITERALINT 	|| token == Token.SUPER
+				|| token == Token.LEFTPAR		|| token == Token.NULL
+				|| token == Token.ID 			|| token == Token.LITERALSTRING;
 
 	}
 
