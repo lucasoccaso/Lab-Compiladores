@@ -227,14 +227,24 @@ public class Compiler {
 	}
 	
 
+	// Apenas lê o 'break'
 	private void breakStat() {
 		next();
-
 	}
 
-	private void returnStat() {
+
+	private Expr returnStat() {
+
+		Expr expr = simpleExpr();
+
+		if ( lexer.token != Token.RETURN) {
+			error("'return' was expected");
+		}
 		next();
-		expr();
+		
+		expr = expr();
+
+		return expr;
 	}
 
 
@@ -249,13 +259,13 @@ public class Compiler {
 		}
 		// Verifica se tem "class"
 		if ( lexer.token != Token.CLASS ) {
-			error("'class' expected");
+			error("'class' was expected");
 		}
 		
 		lexer.nextToken();
 		//Verifica se tem um Id
 		if ( lexer.token != Token.ID ) {
-			error("Identifier expected");
+			error("Identifier was expected");
 		}
 		
 		// Guarda o nome da classe
@@ -270,7 +280,7 @@ public class Compiler {
 			
 			// Verifica sem tem um Id da superclasse
 			if ( lexer.token != Token.ID ) {
-				error("Identifier expected");
+				error("Identifier was expected");
 			}
 			String superclassName = lexer.getStringValue();
 
@@ -282,18 +292,18 @@ public class Compiler {
 
 		memberlist = memberList();
 		if ( lexer.token != Token.END)
-			error("'end' expected");
+			error("'end' was expected");
 		lexer.nextToken();
 
 	}
 
 	private void compStat(){
-    	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
+    	check(Token.LEFTCURBRACKET, "left curl bracket was expected.");
     	next();
     	while(lexer.token != Token.RIGHTCURBRACKET){
     		statement();
     	}
-    	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
+    	check(Token.LEFTCURBRACKET, "left curl bracket was expected.");
     	next();
     }
 
