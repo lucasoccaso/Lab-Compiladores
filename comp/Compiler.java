@@ -227,14 +227,24 @@ public class Compiler {
 	}
 	
 
+	// Apenas lê o 'break'
 	private void breakStat() {
 		next();
-
 	}
 
-	private void returnStat() {
+
+	private Expr returnStat() {
+
+		Expr expr = simpleExpr();
+
+		if ( lexer.token != Token.RETURN) {
+			error("'return' was expected");
+		}
 		next();
-		expr();
+		
+		expr = expr();
+
+		return expr;
 	}
 
 
@@ -249,13 +259,13 @@ public class Compiler {
 		}
 		// Verifica se tem "class"
 		if ( lexer.token != Token.CLASS ) {
-			error("'class' expected");
+			error("'class' was expected");
 		}
 		
 		lexer.nextToken();
 		//Verifica se tem um Id
 		if ( lexer.token != Token.ID ) {
-			error("Identifier expected");
+			error("Identifier was expected");
 		}
 		
 		// Guarda o nome da classe
@@ -270,7 +280,7 @@ public class Compiler {
 			
 			// Verifica sem tem um Id da superclasse
 			if ( lexer.token != Token.ID ) {
-				error("Identifier expected");
+				error("Identifier was expected");
 			}
 			String superclassName = lexer.getStringValue();
 
@@ -282,18 +292,18 @@ public class Compiler {
 
 		memberlist = memberList();
 		if ( lexer.token != Token.END)
-			error("'end' expected");
+			error("'end' was expected");
 		lexer.nextToken();
 
 	}
 
 	private void compStat(){
-    	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
+    	check(Token.LEFTCURBRACKET, "left curl bracket was expected.");
     	next();
     	while(lexer.token != Token.RIGHTCURBRACKET){
     		statement();
     	}
-    	check(Token.LEFTCURBRACKET, "left curl bracket expected.");
+    	check(Token.LEFTCURBRACKET, "left curl bracket was expected.");
     	next();
     }
 
@@ -334,24 +344,34 @@ public class Compiler {
     }
 
 
-    private Expr factor(){
+    private Type factor(){
 
-    	if(lexer.token == Token.LITERALINT || lexer.token == Token.TRUE || lexer.token == Token.FALSE || lexer.token == Token.LITERALSTRING){
+    	if(lexer.token == Token.LITERALINT){
     		next();
+
+    		return new TypeInt();
+    	} else if(lexer.token == Token.TRUE || lexer.token == Token.FALSE){
+    		next();
+
+    		return new TypeBoolean();
+    	} else if(lexer.token == Token.LITERALSTRING){
+    		next();
+
+    		return new TypeString();
+    	} else if(lexer.token == Token.NULL){
+    		next();
+
+    		return new TypeNull();
     	} else if(lexer.token == Token.LEFTPAR){
     		next();
     		expr();
     		check(Token.RIGHTPAR, ") expected");
             next();
+
     	} else if(lexer.token == Token.NOT){
     		next();
     		factor();
-    	} else if(lexer.token == Token.NULL){
-    		next();
-    	} else if(lexer.token == Token.ID){
-
-
-    	} else if(lexer.token == Token.SUPER || lexer.token == Token.SELF){
+    	} else if(lexer.token == Token.SUPER || lexer.token == Token.SELF || lexer.token == Token.ID){
     		primaryExpr();
     	} else if(lexer.token == Token.IN){
     		readExpr();
@@ -581,39 +601,59 @@ public class Compiler {
 
 
     private void primaryExpr() {
+    	//SUPER
         if (lexer.token == Token.SUPER) {
             next();
 
+            //VERIFICAR SE N ESTA NA CLASSE PROGRAM
             check(Token.DOT, "dot expected");
             next();
 
             if (lexer.token == Token.IDCOLON) {
+            	String id = lexer.getStringValue();
+            	//VERIFICAR SE EXISTE METODO
                 next();
                 expressionList();
             } else if (lexer.token == Token.ID) {
+            	String id = lexer.getStringValue();
+            	//VERIFICAR SE EXISTE METODO
                 next();
             } else {
 				error("ID or ID colon expected");
             }
-        } else if (lexer.token == Token.ID) {
-            next();
 
+        //ID
+        } else if (lexer.token == Token.ID) {
+        	String idClass =lexer.getStringValue();
+            next();
             if (lexer.token == Token.DOT) {
                 next();
                 if (lexer.token == Token.ID) {
+                	String id = lexer.getStringValue();
                 	next();
             	} else if (lexer.token == Token.IDCOLON) {
                 	next();
                 	expressionList();
+            	} else if (lexer.token == Token.NEW) {
+            		//VERIFICAR SE A CLASSE FOI DECLARADA
+            		Type tipo = new CianetoClass(idClass);
+
+            		//VERIFICAR SE O TIPO DA CLASSE CRIADA É CONVRTIVEL
+            		next();
+
+            		return new CianetoClass(idClass);
 	            } else {
-					error("ID or ID colon expected");
+					error("ID, ID colon or NEW expected");
 	            }
             }
+        //SELF
         } else if (lexer.token == Token.SELF) {
             next();
             if (lexer.token == Token.DOT) {
                 next();
                 if (lexer.token == Token.ID) {
+                	String id = lexer.getStringValue();
+                	//VERIFICAR SE EXISTE A VARIAVEL
                     next();
                     if (lexer.token == Token.DOT) {
                         next();

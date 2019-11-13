@@ -14,3 +14,7 @@
 /TypeNull.class
 /TypeString.class
 /TypeUndefined.class
+/AssertStat.class
+/AssignExpr.class
+/CompositeExpr.class
+/MemberList.class
