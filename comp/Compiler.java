@@ -5,11 +5,7 @@ package comp;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import ast.LiteralInt;
-import ast.MetaobjectAnnotation;
-import ast.Program;
-import ast.Statement;
-import ast.TypeCianetoClass;
+
 import lexer.Lexer;
 import lexer.Token;
 import ast.*;
@@ -249,7 +245,7 @@ public class Compiler {
 
 
 	// ClassDec ::= [ "open" ] "class" Id [ "extends" Id ] MemberList "end"
-	private TypeCianetoClass classDec() {
+	private void classDec() {
 		MemberList memberlist = null;
 		
 		// Verifica se começa com "open"
@@ -295,6 +291,7 @@ public class Compiler {
 			error("'end' was expected");
 		lexer.nextToken();
 
+		
 	}
 
 	private void compStat(){
@@ -344,24 +341,26 @@ public class Compiler {
     }
 
 
-    private Type factor(){
+    private Expr factor(){
 
     	if(lexer.token == Token.LITERALINT){
-    		next();
-
-    		return new TypeInt();
+    		return literalInt();
+    		
     	} else if(lexer.token == Token.TRUE || lexer.token == Token.FALSE){
     		next();
-
-    		return new TypeBoolean();
+    		if(lexer.token == Token.TRUE)
+    			return LiteralBoolean.True;
+    		else {
+    			return LiteralBoolean.False;
+    		}
+    		
     	} else if(lexer.token == Token.LITERALSTRING){
-    		next();
 
-    		return new TypeString();
+    		return literalString();
     	} else if(lexer.token == Token.NULL){
     		next();
 
-    		return new TypeNull();
+    		return new NullExpr();
     	} else if(lexer.token == Token.LEFTPAR){
     		next();
     		expr();
@@ -382,7 +381,7 @@ public class Compiler {
 
 	private void fieldDec() {
 		lexer.nextToken();
-		type();
+		Type type = type();
 		if ( lexer.token != Token.ID ) {
 			this.error("A field name was expected");
 		}
@@ -472,7 +471,8 @@ public class Compiler {
 
 	// MemberList ::= { [ Qualifier ] Member }
     private MemberList memberList() {
-    	
+    	MemberList memberList = new MemberList();
+		
 		while ( true ) {
 			
 			String qualifier = qualifier();
@@ -487,6 +487,8 @@ public class Compiler {
 				break;
 			}
 		}
+		
+		return null;
 	}
 
     
@@ -533,31 +535,40 @@ public class Compiler {
         next(); // Consome o id
     }
 	
-	private void qualifier() {
+	private String qualifier() {
 		if ( lexer.token == Token.PRIVATE ) {
 			next();
+			return "private";
 		}
 		else if ( lexer.token == Token.PUBLIC ) {
 			next();
+			return "public";
 		}
 		else if ( lexer.token == Token.OVERRIDE ) {
 			next();
 			if ( lexer.token == Token.PUBLIC ) {
 				next();
+				return "override public";
 			}
+			return "override";
 		}
 		else if ( lexer.token == Token.FINAL ) {
 			next();
 			if ( lexer.token == Token.PUBLIC ) {
 				next();
+				return "final public";
 			}
 			else if ( lexer.token == Token.OVERRIDE ) {
 				next();
 				if ( lexer.token == Token.PUBLIC ) {
 					next();
+					return "final override public";
 				}
+				return "final override";
 			}
+			return "final";
 		}
+		return null;
 	}
 
     private String readExpr() {
@@ -589,18 +600,20 @@ public class Compiler {
 
 	private LiteralInt literalInt() {
 
-		LiteralInt e = null;
-
-		// the number value is stored in lexer.getToken().value as an object of
-		// Integer.
-		// Method intValue returns that value as an value of type int.
 		int value = lexer.getNumberValue();
 		lexer.nextToken();
 		return new LiteralInt(value);
 	}
+	
+	private LiteralString literalString() {
+		
+		String value = lexer.getStringValue();
+		lexer.nextToken();
+		return new LiteralString(value);
+	}
 
 
-    private void primaryExpr() {
+    private Expr primaryExpr() {
     	//SUPER
         if (lexer.token == Token.SUPER) {
             next();
@@ -636,12 +649,12 @@ public class Compiler {
                 	expressionList();
             	} else if (lexer.token == Token.NEW) {
             		//VERIFICAR SE A CLASSE FOI DECLARADA
-            		Type tipo = new CianetoClass(idClass);
+            		//Type tipo = new TypeCianetoClass(idClass);
 
             		//VERIFICAR SE O TIPO DA CLASSE CRIADA É CONVRTIVEL
             		next();
 
-            		return new CianetoClass(idClass);
+            		//return new TypeCianetoClass(idClass);
 	            } else {
 					error("ID, ID colon or NEW expected");
 	            }
@@ -674,6 +687,8 @@ public class Compiler {
         } else if (lexer.getStringValue().equals("In")) {
             readExpr();
         }
+        
+        return null;
     }
 
 	private boolean relation() {
@@ -794,18 +809,26 @@ public class Compiler {
     }
 
 
-	private void type() {
+	private Type type() {
 		// BasicType ::= 'Int' | 'Boolean' | 'String'
-		if ( lexer.token == Token.INT || lexer.token == Token.BOOLEAN || lexer.token == Token.STRING ) {
-			next();
+		Type type;
+        
+		switch (lexer.token) {
+			case INT:
+				type = Type.intType;
+				break;
+			case BOOLEAN:
+				type = Type.booleanType;   
+				break;
+			case STRING:
+				type = Type.stringType;
+				break;
+			default:
+				signalError.showError("Type expected");
+				type = Type.undefinedType;
 		}
-		else if ( lexer.token == Token.ID ) {
-			next();
-		}
-		else {
-			this.error("A type was expected");
-		}
-
+		next();
+		return type;
 	}
 
 
